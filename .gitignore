@@ -1,0 +1,38 @@
+/context
+.DS_Store
+.vscode/
+node_modules/
+dist/
+.env
+
+# Binaries
+crawldown
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Output directories (from crawling)
+output/
+example-output/
+
+# Coverage reports
+coverage.html
+
+# Temporary files
+tmp/
+temp/
+*.swp
+*.swo
+*~
+.task/checksum/build

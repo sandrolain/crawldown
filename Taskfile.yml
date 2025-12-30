@@ -1,0 +1,100 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the crawldown binary
+    cmds:
+      - go build -o crawldown ./cmd/main.go
+    sources:
+      - cmd/**/*.go
+      - src/**/*.go
+    generates:
+      - crawldown
+
+  install:
+    desc: Install crawldown to $GOPATH/bin
+    cmds:
+      - go install ./cmd/main.go
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test -v ./src/...
+
+  test-cover:
+    desc: Run tests with coverage report
+    cmds:
+      - go test -v -cover ./src/...
+
+  test-coverage:
+    desc: Run tests with detailed coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./src/...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report generated at coverage.html"
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./src/...
+
+  lint-fix:
+    desc: Run golangci-lint with auto-fix
+    cmds:
+      - golangci-lint run --fix ./src/...
+
+  vuln:
+    desc: Check for vulnerabilities
+    cmds:
+      - govulncheck ./...
+
+  fmt:
+    desc: Format code with gofmt
+    cmds:
+      - gofmt -s -w .
+
+  tidy:
+    desc: Tidy go.mod
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Clean build artifacts and test outputs
+    cmds:
+      - rm -f crawldown
+      - rm -f coverage.out coverage.html
+      - go clean
+
+  check:
+    desc: Run all checks (test, lint, vuln)
+    cmds:
+      - task: test-cover
+      - task: lint
+      - task: vuln
+
+  run:
+    desc: Build and run crawldown (requires URL and OUTPUT_DIR env vars)
+    cmds:
+      - task: build
+      - ./crawldown {{.URL}} {{.OUTPUT_DIR}} {{.DEPTH | default "2"}}
+    requires:
+      vars: [URL, OUTPUT_DIR]
+
+  example:
+    desc: Run example crawl of example.com
+    cmds:
+      - task: build
+      - mkdir -p ./example-output
+      - ./crawldown https://example.com ./example-output 1
+
+  dev:
+    desc: Development setup - install tools
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+      - go install github.com/go-task/task/v3/cmd/task@latest
