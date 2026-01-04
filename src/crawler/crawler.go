@@ -24,6 +24,7 @@ type Options struct {
 	UserAgent           string
 	IgnoreRobotsTxt     bool
 	FollowExternalLinks bool
+	SinglePage          bool     // When true, only the provided start URL is fetched (no link following)
 	RequestTimeout      int      // Timeout in seconds for each request (default: 30)
 	RequestDelay        int      // Delay in seconds between requests (default: 0)
 	ExcludedPaths       []string // URL path prefixes to exclude from crawling
@@ -154,39 +155,41 @@ func (c *Crawler) setupCallbacks() {
 		}
 	})
 
-	// On link callback
-	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
+	// On link callback: only register if not in SinglePage mode
+	if !c.options.SinglePage {
+		c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Attr("href")
 
-		// Skip non-HTTP protocols and anchor links
-		if strings.HasPrefix(link, "#") ||
-			strings.HasPrefix(link, "javascript:") ||
-			strings.HasPrefix(link, "mailto:") ||
-			strings.HasPrefix(link, "tel:") ||
-			strings.HasPrefix(link, "sms:") ||
-			strings.HasPrefix(link, "fax:") ||
-			strings.HasPrefix(link, "data:") ||
-			strings.HasPrefix(link, "file:") {
-			return
-		}
+			// Skip non-HTTP protocols and anchor links
+			if strings.HasPrefix(link, "#") ||
+				strings.HasPrefix(link, "javascript:") ||
+				strings.HasPrefix(link, "mailto:") ||
+				strings.HasPrefix(link, "tel:") ||
+				strings.HasPrefix(link, "sms:") ||
+				strings.HasPrefix(link, "fax:") ||
+				strings.HasPrefix(link, "data:") ||
+				strings.HasPrefix(link, "file:") {
+				return
+			}
 
-		// Skip links that look like email addresses or phone numbers without protocol
-		if looksLikeEmail(link) || looksLikePhone(link) {
-			return
-		}
+			// Skip links that look like email addresses or phone numbers without protocol
+			if looksLikeEmail(link) || looksLikePhone(link) {
+				return
+			}
 
-		// Build absolute URL for checking
-		absoluteURL := e.Request.AbsoluteURL(link)
+			// Build absolute URL for checking
+			absoluteURL := e.Request.AbsoluteURL(link)
 
-		// Skip excluded paths
-		if c.isExcludedPath(absoluteURL) {
-			return
-		}
+			// Skip excluded paths
+			if c.isExcludedPath(absoluteURL) {
+				return
+			}
 
-		// Visit is best effort, errors are logged via OnError callback
-		//nolint:errcheck // Intentionally ignoring error as it's handled by OnError callback
-		_ = e.Request.Visit(link)
-	})
+			// Visit is best effort, errors are logged via OnError callback
+			//nolint:errcheck // Intentionally ignoring error as it's handled by OnError callback
+			_ = e.Request.Visit(link)
+		})
+	}
 
 	// Error callback
 	c.collector.OnError(func(r *colly.Response, err error) {

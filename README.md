@@ -68,6 +68,7 @@ crawldown [OPTIONS] <url> <output-directory>
 - `-e, --exclude EXCLUDE` - URL path prefixes to exclude from crawling (can be specified multiple times)
 - `-t, --timeout TIMEOUT` - Request timeout in seconds (default: 60)
 - `--delay DELAY` - Delay between requests in seconds (default: 1)
+- `-s, --single URL` - Download a single page URL instead of crawling (overrides positional URL)
 - `-h, --help` - Display help message
 - `--version` - Display version information
 
@@ -87,6 +88,13 @@ crawldown -d 3 -e "https://example.com/admin/" -e "https://example.com/private/"
 
 # Crawl with custom timeout and delay
 crawldown -d 3 -t 30 --delay 2 https://example.com ./output
+
+# Download a single indicated page
+crawldown -s "https://example.com/articles/2025/interesting.html" ./output
+
+# Download a single page using the positional URL (old behavior still works)
+crawldown "https://example.com/articles/2025/interesting.html" ./output
+
 ```
 
 ## Architecture

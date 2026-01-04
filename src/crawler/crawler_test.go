@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -98,5 +100,57 @@ func TestCrawlerGetPages(t *testing.T) {
 
 	if len(pages) != 0 {
 		t.Errorf("GetPages() expected empty slice, got %d pages", len(pages))
+	}
+}
+
+func TestCrawlerSinglePageMode(t *testing.T) {
+	// Create a test server with two pages: /index links to /next
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html><head><title>Index</title></head><body><a href="/next">Next</a><main><p>Index content</p></main></body></html>`))
+	})
+	mux.HandleFunc("/next", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html><head><title>Next</title></head><body><main><p>Next content</p></main></body></html>`))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	// SinglePage mode: should only fetch the start URL
+	opts := Options{
+		SinglePage: true,
+	}
+
+	c, err := NewCrawler(srv.URL, opts)
+	if err != nil {
+		t.Fatalf("NewCrawler() unexpected error: %v", err)
+	}
+
+	if err := c.Start(); err != nil {
+		t.Fatalf("Start() unexpected error: %v", err)
+	}
+
+	pages := c.GetPages()
+	if len(pages) != 1 {
+		t.Fatalf("SinglePage mode expected 1 page, got %d", len(pages))
+	}
+	if pages[0].Title != "Index" {
+		t.Fatalf("Unexpected page fetched: %s", pages[0].Title)
+	}
+
+	// Non-single mode: should fetch both pages when following links
+	opts2 := Options{}
+	c2, err := NewCrawler(srv.URL, opts2)
+	if err != nil {
+		t.Fatalf("NewCrawler() unexpected error: %v", err)
+	}
+
+	if err := c2.Start(); err != nil {
+		t.Fatalf("Start() unexpected error: %v", err)
+	}
+
+	pages2 := c2.GetPages()
+	if len(pages2) < 2 {
+		t.Fatalf("Normal mode expected at least 2 pages, got %d", len(pages2))
 	}
 }

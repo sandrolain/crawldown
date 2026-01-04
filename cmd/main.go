@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alexflint/go-arg"
 	"github.com/sandrolain/crawldown/src/converter"
@@ -15,6 +16,7 @@ import (
 type Args struct {
 	URL            string   `arg:"positional,required" help:"The starting URL to crawl"`
 	OutputDir      string   `arg:"positional,required" help:"The directory where markdown files will be saved"`
+	Single         string   `arg:"-s,--single" help:"Download a single page URL instead of crawling (overrides positional URL)"`
 	MaxDepth       int      `arg:"-d,--depth" default:"2" help:"Maximum crawl depth"`
 	ExcludedPaths  []string `arg:"-e,--exclude,separate" help:"URL path prefixes to exclude from crawling"`
 	RequestTimeout int      `arg:"-t,--timeout" default:"60" help:"Request timeout in seconds"`
@@ -69,12 +71,24 @@ func main() {
 
 	// Track URL to filename mapping for link conversion
 	urlToFile := make(map[string]string)
+	var urlToFileMutex sync.Mutex
 	pageData := make(map[string]struct {
 		markdown string
 		filename string
 		pageURL  string
 	})
+	var pageDataMutex sync.Mutex
 	pageCount := 0
+	var pageCountMutex sync.Mutex
+
+	// Determine start URL and single-page mode
+	startURL := args.URL
+	isSingle := false
+	if args.Single != "" {
+		startURL = args.Single
+		isSingle = true
+		fmt.Printf("Single-page mode: fetching %s only\n", startURL)
+	}
 
 	// Initialize crawler
 	crawlerOpts := crawler.Options{
@@ -82,12 +96,13 @@ func main() {
 		UserAgent:           "CrawlDown/1.0",
 		IgnoreRobotsTxt:     false,
 		FollowExternalLinks: false,
+		SinglePage:          isSingle,
 		RequestTimeout:      args.RequestTimeout,
 		RequestDelay:        args.RequestDelay,
 		ExcludedPaths:       args.ExcludedPaths,
 	}
 
-	c, err := crawler.NewCrawler(args.URL, crawlerOpts)
+	c, err := crawler.NewCrawler(startURL, crawlerOpts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating crawler: %v\n", err)
 		os.Exit(1)
@@ -95,8 +110,12 @@ func main() {
 
 	// Set callback to process pages as they are crawled
 	c.OnPage(func(page crawler.Page) {
+		pageCountMutex.Lock()
 		pageCount++
-		fmt.Printf("[%d] Crawling: %s\n", pageCount, page.URL)
+		currentCount := pageCount
+		pageCountMutex.Unlock()
+
+		fmt.Printf("[%d] Crawling: %s\n", currentCount, page.URL)
 
 		// Convert HTML to Markdown
 		markdown, err := conv.Convert(page.Content)
@@ -110,13 +129,17 @@ func main() {
 
 		// Normalize URL (remove trailing slash for consistency)
 		normalizedURL := strings.TrimSuffix(page.URL, "/")
+
+		urlToFileMutex.Lock()
 		urlToFile[normalizedURL] = filename
+		urlToFileMutex.Unlock()
 
 		// Add metadata header
 		header := fmt.Sprintf("# %s\n\nURL: %s\n\n---\n\n", page.Title, page.URL)
 		markdown = header + markdown
 
 		// Store page data for later processing
+		pageDataMutex.Lock()
 		pageData[normalizedURL] = struct {
 			markdown string
 			filename string
@@ -126,6 +149,7 @@ func main() {
 			filename: filename,
 			pageURL:  page.URL,
 		}
+		pageDataMutex.Unlock()
 	})
 
 	// Start crawling
@@ -134,17 +158,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("\nCrawled %d pages. Converting links and saving files...\n\n", pageCount)
+	pageCountMutex.Lock()
+	finalPageCount := pageCount
+	pageCountMutex.Unlock()
+
+	fmt.Printf("\nCrawled %d pages. Converting links and saving files...\n\n", finalPageCount)
 
 	// Second pass: convert links and save files
 	successCount := 0
 	processedCount := 0
-	for _, data := range pageData {
+
+	pageDataMutex.Lock()
+	pageDataCopy := make(map[string]struct {
+		markdown string
+		filename string
+		pageURL  string
+	})
+	for k, v := range pageData {
+		pageDataCopy[k] = v
+	}
+	pageDataMutex.Unlock()
+
+	for _, data := range pageDataCopy {
 		processedCount++
-		fmt.Printf("[%d/%d] Processing: %s\n", processedCount, len(pageData), data.pageURL)
+		fmt.Printf("[%d/%d] Processing: %s\n", processedCount, len(pageDataCopy), data.pageURL)
 
 		// Convert links to local file references
-		markdown := converter.ConvertLinksToLocal(data.markdown, data.pageURL, urlToFile)
+		urlToFileMutex.Lock()
+		urlToFileCopy := make(map[string]string)
+		for k, v := range urlToFile {
+			urlToFileCopy[k] = v
+		}
+		urlToFileMutex.Unlock()
+
+		markdown := converter.ConvertLinksToLocal(data.markdown, data.pageURL, urlToFileCopy)
 
 		outputPath := filepath.Join(args.OutputDir, data.filename)
 
