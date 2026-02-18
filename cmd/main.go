@@ -14,9 +14,9 @@ import (
 
 // Args defines command-line arguments
 type Args struct {
-	URL            string   `arg:"positional,required" help:"The starting URL to crawl"`
-	OutputDir      string   `arg:"positional,required" help:"The directory where markdown files will be saved"`
-	Single         string   `arg:"-s,--single" help:"Download a single page URL instead of crawling (overrides positional URL)"`
+	URL            string   `arg:"-u,--url" help:"The starting URL to crawl (not needed with --single)"`
+	OutputDir      string   `arg:"-o,--output,required" help:"The directory where markdown files will be saved"`
+	Single         string   `arg:"-s,--single" help:"Download a single page URL instead of crawling (overrides --url)"`
 	MaxDepth       int      `arg:"-d,--depth" default:"2" help:"Maximum crawl depth"`
 	ExcludedPaths  []string `arg:"-e,--exclude,separate" help:"URL path prefixes to exclude from crawling"`
 	RequestTimeout int      `arg:"-t,--timeout" default:"60" help:"Request timeout in seconds"`
@@ -36,6 +36,17 @@ func (Args) Version() string {
 func main() {
 	var args Args
 	arg.MustParse(&args)
+
+	// Validate required arguments
+	if args.OutputDir == "" {
+		fmt.Fprintf(os.Stderr, "Error: OUTPUTDIR is required\n")
+		os.Exit(1)
+	}
+
+	if args.Single == "" && args.URL == "" {
+		fmt.Fprintf(os.Stderr, "Error: either a URL (positional) or --single flag is required\n")
+		os.Exit(1)
+	}
 
 	fmt.Printf("Starting crawl of: %s\n", args.URL)
 	fmt.Printf("Output directory: %s\n", args.OutputDir)
