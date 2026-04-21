@@ -1,0 +1,57 @@
+version: 2
+
+project_name: crawldown
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: crawldown
+    main: ./cmd
+    binary: crawldown
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X
+        main.date={{.CommitDate}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: crawldown
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+
+release:
+  github:
+    owner: sandrolain
+    name: crawldown
+
+upx:
+  - ids:
+      - crawldown
+    enabled: true
+    goos:
+      - linux
+      - windows
+    compress: best
+    lzma: true

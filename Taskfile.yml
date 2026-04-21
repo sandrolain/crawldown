@@ -9,7 +9,7 @@ tasks:
   build:
     desc: Build the crawldown binary
     cmds:
-      - go build -o crawldown ./cmd/main.go
+      - go build -o crawldown ./cmd
     sources:
       - cmd/**/*.go
       - src/**/*.go
@@ -19,34 +19,34 @@ tasks:
   install:
     desc: Install crawldown to $GOPATH/bin
     cmds:
-      - go install ./cmd/main.go
+      - go install ./cmd
 
   test:
     desc: Run all tests
     cmds:
-      - go test -v ./src/...
+      - go test -v ./...
 
   test-cover:
     desc: Run tests with coverage report
     cmds:
-      - go test -v -cover ./src/...
+      - go test -v -cover ./...
 
   test-coverage:
     desc: Run tests with detailed coverage report
     cmds:
-      - go test -coverprofile=coverage.out ./src/...
+      - go test -coverprofile=coverage.out ./...
       - go tool cover -html=coverage.out -o coverage.html
       - echo "Coverage report generated at coverage.html"
 
   lint:
     desc: Run golangci-lint
     cmds:
-      - golangci-lint run ./src/...
+      - golangci-lint run ./...
 
   lint-fix:
     desc: Run golangci-lint with auto-fix
     cmds:
-      - golangci-lint run --fix ./src/...
+      - golangci-lint run --fix ./...
 
   vuln:
     desc: Check for vulnerabilities
@@ -78,19 +78,30 @@ tasks:
       - task: vuln
 
   run:
-    desc: Build and run crawldown (requires URL and OUTPUT_DIR env vars)
+    desc: Build and run crawldown get (requires URL and OUTPUT_DIR env vars)
     cmds:
       - task: build
-      - ./crawldown {{.URL}} {{.OUTPUT_DIR}} {{.DEPTH | default "2"}}
+      - ./crawldown get -o {{.OUTPUT_DIR}} --depth {{.DEPTH | default "2"}}
+        {{.URL}}
     requires:
-      vars: [URL, OUTPUT_DIR]
+      vars: [ URL, OUTPUT_DIR ]
 
   example:
     desc: Run example crawl of example.com
     cmds:
       - task: build
       - mkdir -p ./example-output
-      - ./crawldown https://example.com ./example-output 1
+      - ./crawldown get -o ./example-output --depth 1 https://example.com
+
+  release-check:
+    desc: Validate the GoReleaser configuration
+    cmds:
+      - goreleaser check
+
+  release-snapshot:
+    desc: Build release artifacts locally without publishing
+    cmds:
+      - goreleaser release --snapshot --clean
 
   dev:
     desc: Development setup - install tools
@@ -98,3 +109,4 @@ tasks:
       - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - go install golang.org/x/vuln/cmd/govulncheck@latest
       - go install github.com/go-task/task/v3/cmd/task@latest
+      - go install github.com/goreleaser/goreleaser/v2@latest
