@@ -1,5 +1,9 @@
 # CrawlDown
 
+> [!IMPORTANT]
+> This repository is archived. The CrawlDown CLI has been moved into the [sdt](https://github.com/sandrolain/sdt) project as a subcommand.
+> This repository is kept for historical reference.
+
 A Go-based web crawler that downloads and converts website content to Markdown format.
 
 ## Purpose
